@@ -24,6 +24,7 @@ setup(
     },
     entry_points={
         'console_scripts': [
+            'time_trial_node = controller_pkg.time_trial_node:main',
         ],
     },
 )
