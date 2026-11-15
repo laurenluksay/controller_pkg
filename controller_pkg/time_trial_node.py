@@ -21,8 +21,8 @@ from std_msgs.msg import String # Message type for score tracker
 TEAM_NAME = "Team11"
 TEAM_PASSWORD = "MarLau"
 STALL_TIME = 1.0 #s - The time to stall the program so ROS can properly connect
-DRIVE_SPEED = 0.5 #m/s - Speed to drive forward at
-DRIVE_DUR = 3.0 #s - How long the robot should be driving for
+DRIVE_SPEED = 1.0 #m/s - Speed to drive forward at
+DRIVE_DUR = 5.0 #s - How long the robot should be driving for
 END_STALL = 0.5 #s - The time to stall the program at the end so ROS can terminate connections
 CONTROL_PERIOD = 0.1 #s, so runs 10 times /s
 
@@ -38,7 +38,7 @@ class TimeTrialNode(Node):
         # over laptop clock
         super().__init__("time_trial_node",
                          parameter_overrides=[Parameter("use_sim_time,",
-                                              parameter.Type.BOOL, True)],
+                                              Parameter.Type.BOOL, True)],
         )
 
         # driver command publisher
@@ -57,13 +57,13 @@ class TimeTrialNode(Node):
         self.finished = False
 
         # Run control_loop() every TIMER_PERIOD_SECONDS
-        self.control_timer = self.create_timer(TIMER_PERIOD_SECONDS, self.control_loop)
+        self.control_timer = self.create_timer(CONTROL_PERIOD, self.control_loop)
 
         self.get_logger().info("Time trial node started. Waiting before sending start message...")
 
-        def get_sim_time_seconds(self):
-            # Current simulation time, converted from nanoseconds to seconds
-            return self.get_clock().now().nanoseconds / 1e9
+    def get_sim_time_seconds(self):
+        # Current simulation time, converted from nanoseconds to seconds
+        return self.get_clock().now().nanoseconds / 1e9
 
     def change_state(self, new_state):
         # Move to a new step and remember when it started
@@ -87,43 +87,43 @@ class TimeTrialNode(Node):
         velocity_message.angular.z = turn_speed     # radians per second, left is positive
         self.velocity_publisher.publish(velocity_message) # publishes message to Gazebo
 
-        def control_loop(self):
-            current_time = self.get_sim_time_seconds()
+    def control_loop(self):
+        current_time = self.get_sim_time_seconds()
 
-            # On the very first loop, remember when we started waiting
-            # Initialize start time
-            if self.state_start_time is None:
-                self.state_start_time = current_time
+        # On the very first loop, remember when we started waiting
+        # Initialize start time
+        if self.state_start_time is None:
+            self.state_start_time = current_time
 
-            # Calculates how long we have been in the current step
-            time_in_state = current_time - self.state_start_time
+        # Calculates how long we have been in the current step
+        time_in_state = current_time - self.state_start_time
 
-            # Operation for first stage prior to driving
-            if self.current_state == "WAITING_TO_START":
-                # Wait, then start the competition timer
-                if time_in_state >= STALL_TIME:
-                    self.send_score_message(0, "NA")
-                    self.change_state("DRIVING")
+        # Operation for first stage prior to driving
+        if self.current_state == "WAITING_TO_START":
+            # Wait, then start the competition timer
+            if time_in_state >= STALL_TIME:
+                self.send_score_message(0, "NA")
+                self.change_state("DRIVING")
 
-            # Operation for driving state of the robot
-            elif self.current_state == "DRIVING":
-                # Drive forward until the drive time has lapsed
-                if time_in_state < DRIVE_DUR:
-                    self.send_velocity(DRIVE_SPEED, 0.0)
-                else:
-                    self.send_velocity(0.0, 0.0)
-                    self.change_state("STOPPING")
-
-            elif self.current_state == "STOPPING":
-                # Keep sending "stop" for a moment so the robot definitely stops,
-                # then stop the competition timer
+        # Operation for driving state of the robot
+        elif self.current_state == "DRIVING":
+            # Drive forward until the drive time has lapsed
+            if time_in_state < DRIVE_DUR:
+                self.send_velocity(DRIVE_SPEED, 0.0)
+            else:
                 self.send_velocity(0.0, 0.0)
-                if time_in_state >= END_STALL:
-                    self.send_score_message(-1, "NA")
-                    self.change_state("DONE")
+                self.change_state("STOPPING")
 
-            elif self.current_state == "DONE":
-                self.finished = True
+        elif self.current_state == "STOPPING":
+            # Keep sending "stop" for a moment so the robot definitely stops,
+            # then stop the competition timer
+            self.send_velocity(0.0, 0.0)
+            if time_in_state >= END_STALL:
+                self.send_score_message(-1, "NA")
+                self.change_state("DONE")
+
+        elif self.current_state == "DONE":
+            self.finished = True
 
 def main(args=None):
     rclpy.init(args=args)
