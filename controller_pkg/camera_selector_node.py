@@ -94,16 +94,16 @@ class CameraSelectorNode(Node):
         if camera_name == self.selected_camera:
             self.feed_publisher.publish(image_msg)
 
-    def main(args=None):
-        # Start ROS2, create the node, and keep it running until Ctrl+C
-        rclpy.init(args=args)
-        camera_selector_node = CameraSelectorNode()
-        try:
-            rclpy.spin(camera_selector_node)
-        except KeyboardInterrupt:
-            pass
-        finally:
-            camera_selector_node.destroy_node()
-            rclpy.try_shutdown()
-    if __name__ == '__main__':
-        main()
+def main(args=None):
+    # Start ROS2, create the node, and keep it running until Ctrl+C
+    rclpy.init(args=args)
+    camera_selector_node = CameraSelectorNode()
+    try:
+        rclpy.spin(camera_selector_node)
+    except KeyboardInterrupt:
+        pass
+    finally:
+        camera_selector_node.destroy_node()
+        rclpy.try_shutdown()
+if __name__ == '__main__':
+    main()

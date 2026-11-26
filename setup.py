@@ -25,6 +25,7 @@ setup(
     entry_points={
         'console_scripts': [
             'time_trial_node = controller_pkg.time_trial_node:main',
+            'camera_selector_node = controller_pkg.camera_selector_node:main',
         ],
     },
 )
