@@ -31,6 +31,10 @@ MAX_BLUE_FRACTION = 0.7
 # 0.02 gave exactly 4 corners on all 7 photos.
 CORNER_SIMPLIFY_FRACTION = 0.02
 
+# A board whose outline comes within this many pixels of the image border is
+# probably cut off (only partly in view), so its corners would be wrong. Skip it.
+EDGE_MARGIN = 5
+
 
 def find_blue_contours(photo_bgr):
     """
@@ -62,6 +66,22 @@ def measure_blue_fraction(contour, blue_mask):
     if outline_area == 0:
         return 1.0                      # degenerate outline: treat as not a board
     return blue_pixel_count / outline_area
+
+
+def touches_image_edge(contour, image_width, image_height):
+    """
+    Input:  one contour, and the image's width and height in pixels.
+    Output: True if the contour comes within EDGE_MARGIN pixels of any image edge
+            (so the board is probably cut off), otherwise False.
+    """
+    x, y, width, height = cv2.boundingRect(contour)
+
+    touches_left = x <= EDGE_MARGIN
+    touches_top = y <= EDGE_MARGIN
+    touches_right = x + width >= image_width - EDGE_MARGIN
+    touches_bottom = y + height >= image_height - EDGE_MARGIN
+
+    return touches_left or touches_top or touches_right or touches_bottom
 
 
 def find_grey_middle_corners(board_contour, blue_mask):
@@ -126,12 +146,16 @@ def detect_board(photo_bgr, min_board_area):
     If several blobs pass the checks, the biggest one is used (the closest sign).
     """
     contours, blue_mask = find_blue_contours(photo_bgr)
+    image_height = photo_bgr.shape[0]      # shape is (rows, columns, colour channels)
+    image_width = photo_bgr.shape[1]
 
-    # 1. Collect every blob that passes the size and grey-middle checks
+    # 1. Collect every blob that passes the size, edge and grey-middle checks
     board_candidates = []
     for contour in contours:
         area = cv2.contourArea(contour)
         if area < min_board_area:
+            continue
+        if touches_image_edge(contour, image_width, image_height):
             continue
         blue_fraction = measure_blue_fraction(contour, blue_mask)
         if blue_fraction > MAX_BLUE_FRACTION:
