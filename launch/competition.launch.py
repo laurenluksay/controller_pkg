@@ -38,8 +38,17 @@ def generate_launch_description():
         output='screen',
     )
 
+    state_machine = Node(
+        package='controller_pkg',
+        executable='state_machine_node',
+        name='state_machine_node',
+        parameters=[{'use_sim_time': True}],
+        output='screen',
+    )
+
     # Everything listed here starts when the launch file runs
     return LaunchDescription([
         extra_camera_bridge,
         camera_selector,
+        state_machine,
     ])
