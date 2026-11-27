@@ -34,6 +34,10 @@ MIN_AREA_TO_SHOW = 300
 # Measured 2026-11-27: real boards 0.41-0.47, solid blue blocks/slabs 1.0 or more.
 MAX_BLUE_FRACTION = 0.7
 
+# How much approxPolyDP may simplify an outline, as a fraction of its perimeter.
+# Bigger = fewer corners kept. 0.02 gave exactly 4 corners on all 7 photos.
+CORNER_SIMPLIFY_FRACTION = 0.02
+
 WINDOW_NAME = 'Contours: every blue blob, with its number'
 
 
@@ -74,6 +78,64 @@ def measure_blue_fraction(contour, blue_mask):
     return blue_fraction
 
 
+def find_grey_middle_corners(board_contour, blue_mask):
+    """
+    Finds the 4 corners of a board's grey middle (the area inside the blue frame).
+    We use the grey middle, not the outer blue outline, because the outer outline
+    also includes the board's dark blue side edge when it's seen at an angle (sign 7).
+
+    Input:  the board's outer contour, and the blue mask.
+    Output: a 4 x 2 numpy array of (x, y) corner points, or None if it isn't 4 corners.
+    """
+    # 1. Fill in the whole board (frame + middle) in white
+    whole_board = np.zeros_like(blue_mask)
+    cv2.drawContours(whole_board, [board_contour], -1, 255, cv2.FILLED)
+
+    # 2. Remove the blue pixels: what's left is the grey middle (plus the letters' holes)
+    not_blue = cv2.bitwise_not(blue_mask)
+    grey_middle = cv2.bitwise_and(whole_board, not_blue)
+
+    # 3. Outline the grey middle. Keep the biggest outline, in case of small leftover specks.
+    middle_contours, hierarchy = cv2.findContours(grey_middle, cv2.RETR_EXTERNAL,
+                                                  cv2.CHAIN_APPROX_SIMPLE)
+    if len(middle_contours) == 0:
+        return None
+    middle_contour = max(middle_contours, key=cv2.contourArea)
+
+    # 4. Simplify the outline to a few straight sides
+    perimeter = cv2.arcLength(middle_contour, True)            # True = closed shape
+    simplified = cv2.approxPolyDP(middle_contour,
+                                  CORNER_SIMPLIFY_FRACTION * perimeter, True)
+
+    # 5. A board's middle should simplify to exactly 4 corners
+    if len(simplified) != 4:
+        return None
+    return simplified.reshape(4, 2)                            # from (4, 1, 2) to (4, 2)
+
+
+def order_corners(corners):
+    """
+    Puts 4 corner points in a fixed order: top-left, top-right, bottom-right, bottom-left.
+
+    Input:  4 x 2 array of (x, y) points, in any order.
+    Output: 4 x 2 array in the order [top-left, top-right, bottom-right, bottom-left].
+
+    How: in images, x grows to the right and y grows DOWN.
+      x + y is smallest at the top-left and biggest at the bottom-right.
+      y - x is smallest at the top-right and biggest at the bottom-left.
+    """
+    corner_sums = corners[:, 0] + corners[:, 1]           # x + y for each corner
+    corner_differences = corners[:, 1] - corners[:, 0]    # y - x for each corner
+
+    top_left = corners[np.argmin(corner_sums)]            # argmin = position of the smallest value
+    bottom_right = corners[np.argmax(corner_sums)]        # argmax = position of the biggest value
+    top_right = corners[np.argmin(corner_differences)]
+    bottom_left = corners[np.argmax(corner_differences)]
+
+    ordered_corners = np.array([top_left, top_right, bottom_right, bottom_left])
+    return ordered_corners
+
+
 def draw_and_print_contours(photo_bgr, contours, blue_mask, file_name):
     """
     Draws every contour bigger than MIN_AREA_TO_SHOW on a copy of the photo,
@@ -107,6 +169,23 @@ def draw_and_print_contours(photo_bgr, contours, blue_mask, file_name):
               ', box x=' + str(x) + ' y=' + str(y) +
               ' w=' + str(width) + ' h=' + str(height) +
               '  -> ' + verdict)
+
+        # For boards: find the 4 corners of the grey middle and draw them as yellow dots
+        if verdict == 'BOARD':
+            corners = find_grey_middle_corners(contour, blue_mask)
+            if corners is None:
+                print('     corners: NOT FOUND (not 4 corners)')
+            else:
+                ordered_corners = order_corners(corners)
+                print('     corners (TL, TR, BR, BL): ' + str(ordered_corners.tolist()))
+                corner_labels = ['TL', 'TR', 'BR', 'BL']
+                for corner_index in range(4):
+                    corner_x = int(ordered_corners[corner_index][0])
+                    corner_y = int(ordered_corners[corner_index][1])
+                    cv2.circle(drawing, (corner_x, corner_y), 6, (0, 255, 255), -1)
+                    cv2.putText(drawing, corner_labels[corner_index],
+                                (corner_x + 8, corner_y + 5),
+                                cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 255), 2)
 
         # Outline in the verdict colour, thickness 2, and the number just above the blob
         cv2.drawContours(drawing, [contour], -1, outline_colour, 2)
