@@ -105,6 +105,12 @@ class StateMachineNode(Node):
         """
         self.send_score_message(0,'NA')
 
+    def stop_timer(self):
+            """
+            Stops Competition Clock. Last message sent by robot
+            """
+            self.send_score_message(-1,'NA')
+    
     def change_state(self, new_state):
         """
         Moving from one state to the next and recording when that change occurs to allow
@@ -118,13 +124,9 @@ class StateMachineNode(Node):
             2. sets self.state = new_state
             3. sets self.state_start_time = self.get_clock().now()
         """
-        #TODO implement this
-
-    def stop_timer(self):
-        """
-        Stops Competition Clock. Last message sent by robot
-        """
-        self.send_score_message(-1,'NA')
+        self.get_logger().info('State: ' + self.state + ' -> ' + new_state)
+        self.state = new_state
+        self.state_start_time = self.get_clock().now()
 
     def time_in_state(self):
         """
@@ -132,11 +134,13 @@ class StateMachineNode(Node):
 
         Process:
             1. Gets current sim time with self.get_clock().now()
-            2. Subtracts self.state_start_time twice to find Duration
+            2. Subtracts self.state_start_time to find Duration
             3. Converts duration to seconds
         """
-        #TODO implement this
-
+        current_time = self.get_clock().now()
+        elapsed = current_time - self.state_start_time
+        return elapsed.nanoseconds / 1e9
+        
     def control_loop(self):
         """
         Repeats state action until told otherwise
