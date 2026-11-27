@@ -10,7 +10,6 @@ import subprocess
 
 # Names were found with 'gz service -l' and 'gz model --list' (2026-11-26)
 WORLD_NAME = 'fast_world'
-ROBOT_MODEL_NAME = 'my_robot'
 SET_POSE_SERVICE = '/world/' + WORLD_NAME + '/set_pose'
 
 # Height to spawn robot at to avoid phasing into void
@@ -38,9 +37,9 @@ def yaw_to_quaterion(yaw):
 
     return quat_x, quat_y, quat_z, quat_w
 
-def teleport(x, y, z, yaw):
+def teleport(x, y, z, yaw, model_name='my_robot'):
     """
-    Move to robot instantly to (x,y) and facing yaw in radians
+    Move to specified model instantly to (x,y) and facing yaw in radians
     Outputs: True if Gzebo says the move worked, false otherwise
 
     **Note:** Stop the robot before calling this (publish zero /cmd_vel) otherwise
@@ -50,7 +49,7 @@ def teleport(x, y, z, yaw):
 
     #Build request text
 
-    request_text = ('name: "' + ROBOT_MODEL_NAME + '",'
+    request_text = ('name: "' + model_name + '",'
                     'position: {'
                     'x: ' + str(x) + ', '
                     'y: ' + str(y) + ', '
