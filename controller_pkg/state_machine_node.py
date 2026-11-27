@@ -17,7 +17,7 @@ from controller_pkg.driving import teleport, DEFAULT_SPAWN_HEIGHT
 
 # ---------------- Timings (seconds of sim time) ----------------
 STARTUP_WAIT = 1.0   # wait after launch before starting the timer
-READ_TIME = 6.0 # seconds to pause and read signs
+READ_TIME = 1.0 # seconds to pause and read signs
 
 # ---------------- Team info ----------------
 TEAM_NAME = 'Team11'
@@ -26,8 +26,8 @@ TEAM_PASSWORD = 'MarLau'
 # ---------------- Teleport poses ----------------
 # (x [m], y [m], yaw [rad]) - recorded 2026-11-26 with `gz model -m my_robot -p`
 HOME_POSE = (-5.5, -2.5, math.pi / 2)            # start box, free respawn
-FIRST_SPAWN_POSE = (-0.5, 0.0, -math.pi / 2)     # first pink line past the truck -> clues 4, 6, 5
-SECOND_SPAWN_POSE = (4.0, 2.3, math.pi)        # tunnel at the mountain base -> clue 7
+FIRST_SPAWN_POSE = (-0.575, 0.0, -math.pi / 2)     # first pink line past the truck -> clues 4, 6, 5
+SECOND_SPAWN_POSE = (4.1, 2.3, math.pi)        # tunnel at the mountain base -> clue 7
 
 # ---------------- Loop rate ----------------
 CONTROL_PERIOD = 0.05   # seconds between control loop runs (20 Hz)
@@ -35,14 +35,13 @@ CONTROL_PERIOD = 0.05   # seconds between control loop runs (20 Hz)
 # ---------------- Drive Segments ----------------
 #Format: (Linear {m/s}, Angular {rad/s}, time {s})
 SIGN_1_DRIVE = (0.0, 0.0, 0.0) #Pause to read
-SIGN_2_DRIVE = (0.5, 0.0, 6.0) #Home y=-2/5 -> y=0.5
-SIGN_3_DRIVE = (0.5, 0.0, 2.0) # y=0.5 -> y=1.5
-SIGN_4_DRIVE = (-0.5, 0.0, 4) # y=0 -> y=1.5
-SIGN_6_DRIVE = (0.6, 0.0, 6.0) # y=1.5 -> y=-1.7
-SIGN_5_DRIVE = (0.0, math.pi/4, 1.0) # Turn pi/4
-SIGN_7_DRIVE_1 = (-0.4, 0.0, 0.25) # x=4.0 -> x=4.1
-SIGN_7_DRIVE_2 = (0.0, math.pi/4, 1.0) # Turn pi/4
-
+SIGN_2_DRIVE = (0.5, 0.0, 5.5) #Home y=-2.5 -> y=0.5
+SIGN_3_DRIVE = (0.5, 0.0, 2.6) # y=0.5 -> y=1.5
+SIGN_4_DRIVE = (-0.5, 0.0, 3.0) # y=0 -> y=1.5
+SIGN_6_DRIVE = (0.6, 0.0, 5.0) # y=1.5 -> y=-1.7
+SIGN_5_DRIVE_1 = (0.5, 0.0, 1.2) # y=-1.7 -> y=-2.2
+SIGN_5_DRIVE_2 = (0.0, math.pi/4, 0.8) # Turn to Sign 5
+SIGN_7_DRIVE = (0.0, math.pi/4, 1.3) # Turn to Sign 7
 
 class StateMachineNode(Node):
 
@@ -120,10 +119,10 @@ class StateMachineNode(Node):
         self.send_score_message(0,'NA')
 
     def stop_timer(self):
-            """
-            Stops Competition Clock. Last message sent by robot
-            """
-            self.send_score_message(-1,'NA')
+        """
+        Stops Competition Clock. Last message sent by robot
+        """
+        self.send_score_message(-1,'NA')
     
     def change_state(self, new_state):
         """
@@ -131,7 +130,7 @@ class StateMachineNode(Node):
         states to time themselves.
 
         Inputs:
-            new_state: the name of the next state, ex. 'CLUE_1'
+            new_state: the name of the next state, ex. 'SIGN1'
 
         Process:
             1. Logs transition for bookkeeping/visualization
@@ -250,11 +249,16 @@ class StateMachineNode(Node):
         # ------------------------------------------- #
 
         elif self.state == 'SIGN5':
-            linv, angv, dur = SIGN_5_DRIVE
-            if self.time_in_state() < dur:
-                self.drive(linv, angv)
+            linv1, angv1, dur1 = SIGN_5_DRIVE_1
+            linv2, angv2, dur2 = SIGN_5_DRIVE_2
             
-            elif self.time_in_state() < dur + READ_TIME:
+            if self.time_in_state() < dur1:
+                self.drive(linv1, angv1)
+
+            elif self.time_in_state() < dur1 + dur2:
+                self.drive(linv2, angv2)
+            
+            elif self.time_in_state() < dur1 + dur2 + READ_TIME:
                 self.stop()
 
             else:
@@ -273,16 +277,14 @@ class StateMachineNode(Node):
             self.select_camera('front')    
             self.change_state('SIGN7')
 
-        elif self.state == 'SIGN7':
-            linv1, angv1, dur1 = SIGN_7_DRIVE_1
-            linv2, angv2, dur2 = SIGN_7_DRIVE_2
-            if self.time_in_state() < dur1:
-                self.drive(linv1, angv1)
+        # ------------------------------------------- #
 
-            elif self.time_in_state() < dur1 + dur2:
-                self.drive(linv2, angv2)
-            
-            elif self.time_in_state() < dur1 + dur2 + READ_TIME:
+        elif self.state == 'SIGN7':
+            linv, angv, dur = SIGN_7_DRIVE
+            if self.time_in_state() < dur:
+                self.drive(linv, angv)
+
+            elif self.time_in_state() < dur + READ_TIME:
                 self.stop()
 
             else:
