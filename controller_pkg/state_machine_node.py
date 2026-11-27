@@ -15,7 +15,8 @@ from std_msgs.msg import String
 
 from controller_pkg.driving import teleport, DEFAULT_SPAWN_HEIGHT
 
-
+# ---------------- Timings (seconds of sim time) ----------------
+STARTUP_WAIT = 1.0   # wait after launch before starting the timer
 # ---------------- Team info ----------------
 TEAM_NAME = 'Team11'
 TEAM_PASSWORD = 'MarLau'
@@ -95,7 +96,7 @@ class StateMachineNode(Node):
         score_text = TEAM_NAME + ',' + TEAM_PASSWORD + ',' + str(location) + ',' + value
         score_msg.data = score_text
         self.score_publisher.publish(score_msg)
-        self.get_logger().info('Sent score message:' + score_text)
+        self.get_logger().info('Sent score message: ' + score_text)
 
 
     def start_timer(self):
@@ -143,10 +144,22 @@ class StateMachineNode(Node):
         
     def control_loop(self):
         """
-        Repeats state action until told otherwise
+        Runs every CONTROL_PERIOD. Does the current state's action and
+        decides when to move to the next state.
         """
-        # Runs every CONTROL_PERIOD. The states go here.
-        pass
+        if self.state == 'STARTUP':
+            # Wait so publishers finish connecting, then start the run
+            if self.time_in_state() >= STARTUP_WAIT:
+                self.start_timer()
+                self.select_camera('front')
+                self.change_state('CLUE_1')
+
+        elif self.state == 'CLUE_1':
+            # Placeholder until driving is tuned
+            self.stop()
+
+        else:
+            self.get_logger().warn('Unknown state: ' + self.state)
 
 
 def main(args=None):
