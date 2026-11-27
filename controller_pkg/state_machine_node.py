@@ -79,7 +79,9 @@ class StateMachineNode(Node):
         Inputs:
             camera_name: 'front', 'back', 'left', 'right'
         """
-        #TODO implement this
+        selection_msg = String()
+        selection_msg.data = camera_name
+        self.camera_select_publisher.publish(selection_msg)
 
     def send_score_message(self, location, value):
         """
@@ -89,7 +91,12 @@ class StateMachineNode(Node):
             location: The clue location number. 0 = start timer, -1 = stop timer
             value: Clue text or NA for timer messages
         """
-        #TODO implement this
+        score_msg = String()
+        score_text = TEAM_NAME + ',' + TEAM_PASSWORD + ',' + str(location) + ',' + value
+        score_msg.data = score_text
+        self.score_publisher.publish(score_msg)
+        self.get_logger().info('Sent score message:' + score_text)
+
 
     def start_timer(self):
         """
