@@ -16,8 +16,8 @@ from std_msgs.msg import String
 from controller_pkg.driving import teleport, DEFAULT_SPAWN_HEIGHT
 
 # ---------------- Timings (seconds of sim time) ----------------
-STARTUP_WAIT = 1.0   # wait after launch before starting the timer
-READ_TIME = 1.0 # seconds to pause and read signs
+STARTUP_WAIT = 2.5   # wait after launch before starting the timer
+READ_TIME = 0.25 # seconds to pause and read signs
 
 # ---------------- Team info ----------------
 TEAM_NAME = 'Team11'
@@ -37,8 +37,8 @@ CONTROL_PERIOD = 0.05   # seconds between control loop runs (20 Hz)
 SIGN_1_DRIVE = (0.0, 0.0, 0.0) #Pause to read
 SIGN_2_DRIVE = (0.5, 0.0, 5.5) #Home y=-2.5 -> y=0.5
 SIGN_3_DRIVE = (0.5, 0.0, 2.6) # y=0.5 -> y=1.5
-SIGN_4_DRIVE = (-0.5, 0.0, 3.0) # y=0 -> y=1.5
-SIGN_6_DRIVE = (0.6, 0.0, 5.0) # y=1.5 -> y=-1.7
+SIGN_4_DRIVE = (-0.5, 0.0, 3.2) # y=0 -> y=1.5
+SIGN_6_DRIVE = (0.6, 0.0, 5.4) # y=1.5 -> y=-1.7
 SIGN_5_DRIVE_1 = (0.5, 0.0, 1.2) # y=-1.7 -> y=-2.2
 SIGN_5_DRIVE_2 = (0.0, math.pi/4, 0.8) # Turn to Sign 5
 SIGN_7_DRIVE = (0.0, math.pi/4, 1.3) # Turn to Sign 7
@@ -171,7 +171,7 @@ class StateMachineNode(Node):
         elif self.state == 'SIGN1':
             linv, angv, dur = SIGN_1_DRIVE
                                 
-            if self.time_in_state() < READ_TIME:
+            if self.time_in_state() < READ_TIME + 2.0:
                 self.stop()
 
             else:
