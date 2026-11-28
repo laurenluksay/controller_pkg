@@ -37,6 +37,14 @@ def generate_launch_description():
         parameters=[{'use_sim_time': True}],
         output='screen',
     )
+    # Clue board detector: finds the board in /selected_camera_feed
+    clue_detector = Node(
+        package='controller_pkg',
+        executable='clue_detector_node',
+        name='clue_detector_node',
+        parameters=[{'use_sim_time': True}],
+        output='screen',
+    )
 
     state_machine = Node(
         package='controller_pkg',
@@ -51,4 +59,5 @@ def generate_launch_description():
         extra_camera_bridge,
         camera_selector,
         state_machine,
+        clue_detector,
     ])
