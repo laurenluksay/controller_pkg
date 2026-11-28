@@ -1,16 +1,19 @@
 """
-clue_detection.py - finds the clue board in a camera image.
+clue_detection.py - finds the clue board in a camera image and straightens it.
 
 This is NOT a ROS node. It's a plain Python module with the detection functions
 (tested on saved photos with tools/contour_test.py), so the clue detector node
 can import them and stay short.
 
 Usage from a node in this package:
-    from controller_pkg.clue_detection import detect_board
+    from controller_pkg.clue_detection import detect_board, straighten_board
 
-Main function:
+Main functions:
     detect_board(photo_bgr, min_board_area) -> 4 ordered corners of the board's
     grey middle [top-left, top-right, bottom-right, bottom-left], or None.
+
+    straighten_board(photo_bgr, ordered_corners) -> a flat, straight-on picture
+    of the grey middle, always BOARD_IMAGE_WIDTH x BOARD_IMAGE_HEIGHT pixels.
 """
 
 import cv2
@@ -34,6 +37,12 @@ CORNER_SIMPLIFY_FRACTION = 0.02
 # A board whose outline comes within this many pixels of the image border is
 # probably cut off (only partly in view), so its corners would be wrong. Skip it.
 EDGE_MARGIN = 5
+
+# Size of the straightened board picture, in pixels.
+# The grey middle (clue banner) is 0.15 m x 0.10 m in Miti's clue board model,
+# so the picture keeps the same 3 : 2 shape (600 / 400 = 0.15 / 0.10).
+BOARD_IMAGE_WIDTH = 600
+BOARD_IMAGE_HEIGHT = 400
 
 
 def find_blue_contours(photo_bgr):
@@ -129,6 +138,44 @@ def order_corners(corners):
     bottom_left = corners[np.argmax(corner_differences)]
 
     return np.array([top_left, top_right, bottom_right, bottom_left])
+
+
+def straighten_board(photo_bgr, ordered_corners):
+    """
+    Turns the angled board in the photo into a flat, straight-on picture of its
+    grey middle (inverse perspective transform), always the same size.
+
+    Inputs:
+        photo_bgr       - the camera image (BGR)
+        ordered_corners - 4 x 2 array [TL, TR, BR, BL] of the grey middle's
+                          corners in image pixels, as detect_board returns them
+    Output: BGR image, BOARD_IMAGE_HEIGHT rows x BOARD_IMAGE_WIDTH columns.
+    """
+    # 1. Where the corners are now (in the photo). OpenCV needs float32 here.
+    source_corners = ordered_corners.astype(np.float32)
+
+    # 2. Where the corners should end up: the corners of the output picture,
+    #    in the same order TL, TR, BR, BL. Last pixel index = size - 1.
+    right_edge = BOARD_IMAGE_WIDTH - 1
+    bottom_edge = BOARD_IMAGE_HEIGHT - 1
+    destination_corners = np.array([
+        [0, 0],                         # top-left
+        [right_edge, 0],                # top-right
+        [right_edge, bottom_edge],      # bottom-right
+        [0, bottom_edge],               # bottom-left
+    ], dtype=np.float32)
+
+    # 3. Work out the 3 x 3 matrix that moves the source corners onto the
+    #    destination corners (4 point pairs = exactly enough to solve it).
+    transform_matrix = cv2.getPerspectiveTransform(source_corners,
+                                                   destination_corners)
+
+    # 4. Apply it to the whole photo. Only the area inside the 4 corners lands
+    #    inside the output picture, so this also crops to the grey middle.
+    #    Output size is given as (width, height).
+    straight_board = cv2.warpPerspective(photo_bgr, transform_matrix,
+                                         (BOARD_IMAGE_WIDTH, BOARD_IMAGE_HEIGHT))
+    return straight_board
 
 
 def detect_board(photo_bgr, min_board_area):
