@@ -7,8 +7,12 @@ Subscribes:
 Publishes:
     /clue_detector/debug_image (sensor_msgs/Image) - the camera image with the detected
                                                      board outline and corners drawn on it
+    /clue_detector/board_image (sensor_msgs/Image) - the detected board's grey middle,
+                                                     straightened to a flat 600 x 400 picture
+                                                     (only published when a board is found)
 
-The detection itself lives in clue_detection.py (detect_board).
+The detection and straightening live in clue_detection.py
+(detect_board, straighten_board).
 """
 
 import cv2
@@ -19,7 +23,7 @@ from rclpy.qos import qos_profile_sensor_data
 from sensor_msgs.msg import Image
 from std_msgs.msg import String
 
-from controller_pkg.clue_detection import detect_board
+from controller_pkg.clue_detection import detect_board, straighten_board
 
 
 # Smallest board outline area (pixels) worth reading, for each camera.
@@ -60,6 +64,10 @@ class ClueDetectorNode(Node):
         self.debug_image_publisher = self.create_publisher(
             Image, '/clue_detector/debug_image', 10)
 
+        # Straightened board picture, to check the perspective transform live
+        self.board_image_publisher = self.create_publisher(
+            Image, '/clue_detector/board_image', 10)
+
         self.get_logger().info('Clue detector started, assuming "' +
                                self.current_camera + '" camera')
 
@@ -72,7 +80,8 @@ class ClueDetectorNode(Node):
             self.get_logger().warn('Unknown camera name: ' + camera_name)
 
     def image_callback(self, image_message):
-        """Runs once per camera frame: find the board and publish the debug picture."""
+        """Runs once per camera frame: find the board, publish the debug picture and,
+        if a board was found, the straightened board."""
         # 1. ROS Image -> OpenCV image (BGR, like cv2.imread gives)
         photo_bgr = self.bridge.imgmsg_to_cv2(image_message, desired_encoding='bgr8')
 
@@ -96,6 +105,12 @@ class ClueDetectorNode(Node):
             # At most one log line per second, so the terminal doesn't flood
             self.get_logger().info('Board found on ' + self.current_camera + ' camera',
                                    throttle_duration_sec=1.0)
+
+            # Straighten the board and publish it, keeping the original timestamp
+            straight_board = straighten_board(photo_bgr, ordered_corners)
+            board_message = self.bridge.cv2_to_imgmsg(straight_board, encoding='bgr8')
+            board_message.header = image_message.header
+            self.board_image_publisher.publish(board_message)
 
         cv2.putText(debug_image, 'camera: ' + self.current_camera, (10, 30),
                     cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0, 0, 255), 2)
